@@ -1,0 +1,212 @@
+---
+title: "WHY ARE THEY LAUGHING?"
+author: "Victor Saidi Phiri"
+date: \today{}
+output:
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+  word_document: default
+subtitle: A content analysis of Facebook news posts from Aljazeera on the war in Ukraine
+header-includes:
+- \usepackage{float}
+- \usepackage{array}
+- \usepackage{multirow}
+- \usepackage{multicol}
+- \usepackage{longtable}
+- \usepackage{dcolumn}
+geometry: margin=2cm
+---
+\newpage 
+\tableofcontents 
+\newpage
+```{r setup, include=FALSE}
+require("knitr")
+require("summarytools")
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message = FALSE, comment=NA,prompt = FALSE, cache = FALSE, results = 'asis',fig.width = 8,fig.height = 6,results = 'asis',tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+ 
+
+st_options(bootstrap.css     = FALSE,       # Already part of the theme so no need for it
+           plain.ascii       = FALSE,       # One of the essential settings
+           style             = "rmarkdown", # Idem.
+           dfSummary.silent  = TRUE,        # Suppresses messages about temporary files
+           footnote          = NA,          # Keeping the results minimalistic
+           subtitle.emphasis = T)       # For the vignette theme, this gives better results.
+                                            # For other themes, using TRUE might be preferable.
+
+st_css()
+
+```
+
+```{r Load packages}
+ 
+library(tidyr)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+ALJAZEERA <- read_excel("ALJAZEERA.xlsx")
+
+```
+
+# Introduction 
+
+For anyone that's used social media sites long enough, emojis are a currency and language that one cannot avoid or overlook. These digital artifacts have become so ubiquitous that in 2015 the Oxford Dictionary named emojis as the word of the year after a tripled increase in their use than previous years. Soon after, in 2016 the world's largest social network site, Facebook, extended reactions to posts on its platform from the like or thumbs-up button to six new other Reaction buttons, allowing users to express more emotion than just liking something. According to Facebook, the company had finally conceded that its platform needed a more nuanced way for users to interact with content. Commenting may afford nuanced responses, but people needed a way to leave feedback that was quick, easy, and gesture-based. Emojis, it seemed, were the best option.
+Various scholars have attempted to study emojis in the field of communication, linguistics and psychology. This new yet pervasive affordance uses pictograms to represent emotions and make it possible for online users to interact with content in a way that can be likened to emotional responses (Wilkerson et al, 2021). As news consumption is increasingly taking place in online spaces, Hermida et al. (2012) assert that the public has gained the capacity to influence the salience of issues that get attention and come to the fore of public discourse. It can be argued that the war in Ukraine has received relatively more attention from mainstream news than most conflicts in recent times. During the first months of the conflict, Kersley (2022) shows that many news outlets had record-breaking levels of online user engagement; the BBC's news coverage of the conflict had 396 million page views in the first three weeks after Russia's invasion, while The Guardian reported that February was its fifth highest month ever for page views, and Google Trends data showed an uptick in searches for Ukraine-Russia related news. The war in Ukraine, therefore, offers an ample opportunity to examine and assess the nature of public engagement with news online; in what ways they are doing so and why; and consequently how this affects the way news is presented online on platforms like Facebook.
+
+It is worth acknowledging that when evaluating news engagement on social networking sites, a lot of other considerations ought to be made such as user psychology, platform affordances and algorithm influence on content among other things. This empirical study's scope, however, attempts to offer a nuanced understanding of how online users, using Facebook Reactions, engage with news content of salient issues, in this case, the war in Ukraine. Using Facebook Reactions as a form of engagement, the study rests on the assertion that the nature of news engagement on Facebook has changed in recent years owing to the platform’s affordance of Emoji Reactions. Therefore, the research question is:
+
+*RQ: To what extent do Facebook reactions reflect news engagement on news coverage of the war in Ukraine?*
+
+To answer this question, quantitative content analysis of Facebook posts about the war in Ukraine wasdone. The 'social' nature of Facebook means that news on the platform comes from a wide range of sources such as a friend posting current affairs in their personal capacity, in this study, the focus is on news posts that originated from a professional news provider – Al Jazeera. This media outlet was selected owing to its global reach and extensive coverage of the conflict in Ukraine. Also, its audience demographics might offer interesting findings; Aljazeera, as a non-western media outlet, has a large readership of people outside of Europe, where the conflict is happening. Furthermore, in this paper, the war in Ukraine is considered a political contestation. Zhurzhenko (2022) says Russia's invasion of Ukraine has posed a major challenge to the "liberal script" or Western liberal democracy. As such, the war, in many ways, is a clash of values between Russia and Western nations (the USA and EU).
+The paper has the following sections; a literature review that will break down what scholars have found with regard to news engagement on Facebook and Emoji Reactions. The second section deals with the research methods used. The third section presents the findings and later the discussion. And lastly, concluding remarks will be laid out.
+
+# Literature Review
+## News engagement on Facebook
+
+Social media sites such as Facebook have become an integral part of how people access news. Despite this, various research on news engagement on the platform have found that social media users do not purposefully seek out news content when they are checking their newsfeeds. The 2022 Reuters Digital News Report found that interest in news and overall news engagement has considerably declined, and that the number of people actively avoiding news has also increased markedly (Neuman et al, 2022). Ha et al, (2018) defined news engagement as the involvement in news content for either personal or social purposes, which can be indicated by the effort made in obtaining and utilising the news content among the audience.
+As stated earlier, the conflict in Ukraine increased news engagement across many media outlets around the world. However, a second Digital News Report survey in five valueries undertaken in early April further revealed high levels of selective avoidance two months after the start of the conflict, even in valueries like Poland and Germany where people have been directly impacted by the conflict. This may be due to the difficult and depressing nature of the coverage. On facebook, Bode (2016) asserts that users often choose to use the media itself for nonpolitical purposes. However, once they have opted into a particular medium and its corresponding network, they may be exposed to information they did not seek out or want to see.
+
+## Emoji Reactions
+
+This extension of Facebook reactions has attracted scholars to consider the immediate implications. Eberlet al., (2020) investigated the relationship between content characteristics and the corresponding Reactions. Jost and colleagues found that inclusionary populist appeals trigger more Love Reactions whereas exclusionary populist content elicited Anger Reactions (Jost, Maurer, and Hassler 2020). Sumner et al., (2020) found that users apply the Like button differently now there are more ways to React to a post; emotional posts trigger more Likes and Reactions, at least in the context of crisis communication (Ross et al., 2018). Other research indicates that Facebook's choice to provide an Angry reaction, but not a Dislike button, compounds anger, and some users have appropriated Facebook Reactions as a tool to propagate anti-islam and xenophobic sentiments (Matamoros-Fernandez, 2018).
+Some scholars have attempted to evaluate the value of using emoji Reactions measure to user engagement (Tian et al., 2017), and to assess their impact on further engagement (shareability and commenting) (Larsson, 2018) as well as the rank indexing of information in search engines (Badache and Boughanem, 2017). Facebook Reactions have also been seen to influence the news feed since, no matter which Reaction a user clicks on, Facebook interprets the move as an indication that people want to know more about that type of content, according to the company. The Washington Post also pointed out that Facebook’s indexing algorithm treated emoji reactions as five times more valuable than "likes".
+
+Owing to the information overload on social networking sites like Facebook, it can be argued that users React to posts without thoughtful deliberation of the content on their news feeds akin to Chaiken's Heuristics-Systematic model which posits that cues are processed heuristically by triggering a train of thought about a message that allows people to make a quick judgement about the message, rather than processing the message in a more effortful or systematic manner (Chaiken, 1980). Or perhaps how the message is tailored elicit different emotional reactions from users. The literature available does not provide a clear relationship between the contents in a news post and the corresponding Reactions, however, based on the idea that a Heart or Laugh Reaction can serve as a social cue ("if others think this way, then I should think so too") either through bandwagon (Sundar et al., 2007) or endorsement heuristics (Metzger and Flanagin, 2013), the study's hypothesis is:
+
+*H1: News posts focused on political actors will have more laugh Reactions while citizen-focused news posts will have less*.
+
+# Research Design and Method
+
+As previously mentioned, this study aims to assess news engagement practices in the form of Emoji Reactions on Facebook. The source of the data is Al Jazeera's Facebook page, one of the world's biggest non-Western media outlets. Owing to the social nature of Facebook as explained above, a 'dummy' facebook acvalue was created for the purpose of data collection so as to avoid biased search results based on the researcher's social network. In the absence of automated tools to mine data off Facebook, a manual data collection method was settled for; to do this, a search was done on Facebook's search engine with the following search keywords: "Al Jazeera Ukraine", "Al Jazeera Russia", "Al Jazeera Putin", "Al Jazeera Zelenskyy" and "Al Jazeera NATO". These keywords were selected based on the fact that they have been the most commonly used names to reference the conflict in Ukraine by various news outlets.  News posts between August 1 and October 12 were collected; this timeline was selected for ease of data accessibility, and a total of 128 posts were collected in the initial data collection. The final sample was determined by the following factors;
+
+1.	**Engagement**: any posts with 3000+ reactions
+2.	Reference to the war in Ukraine: any posts with any of the searched keywords above or had an image or video of the conflict.
+
+Based on this selection criteria, the final sample was composed of 60 posts (n=60). These were then coded in accordance with the focus of the study. The independent variables included: Actors - posts that included an image/video or text referring to any key political or non-political players in the conflict (Putin (n=14), Zelenskyy (n=6), Other elites (n=9) and ordinary citizens (n=21)
+
+Issue salience - within the broader context of the conflict, there have been issues salient in the media coverage: Economy (n=7), Politics (n=39, Humanitarian (n=14). The 'like' Reactions was excluded in the data analysis due to it being the 'default' reaction to posts, while the 'Care' Reaction was excluded due to its the focus was therefore placed on the six other Reactions. Post visibility on public facebook pages is limited; older posts are not shown on the newsfeed For example, posts depicting victims of the conflict, migration was coded as HUMANITARIAN, while posts depicting political players and referenced sanctions, diplomatic ties or weapons was coded as POLITICS,  and posts that made reference to inflation, oil prices, currencies or global trade was coded as ECONOMY.
+
+# Results 
+
+Laughter was found to be the common reaction on the news post followed by anger and sad. **Figure1** shows the common reactions per news post.We also found that news posts focusing on politics had more reactions that others(See figure2 for details). Further, we also found that Economic posts were associated with Heart, Laugh and wow reactions while Humantarian were associated with laughter, anger and Sad reactions. Political posts had mostly Laughter and Heart reactions.  
+
+```{r Long format}
+df_long= gather(ALJAZEERA,key = "REACTIONS",value = "value", LAUGH:WOW)
+
+#Set the desired number of total observations (200)
+desired_total_observations <- 500
+
+# Calculate how many additional observations you need
+additional_observations_needed <- desired_total_observations - nrow(df_long)
+
+# Randomly sample the original data to create additional observations
+additional_data <- df_long[sample(1:nrow(df_long), additional_observations_needed, replace = TRUE), ]
+
+# Combine the original data and additional data to create the new dataset
+Newsposts <- rbind(df_long, additional_data)
+
+```
+
+```{r}
+Newsposts %>% ggplot(aes(REACTIONS,value,fill=REACTIONS))+geom_col()+theme_bw()+
+  ggtitle("Figure1: Common Reactions")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),legend.position = "none")
+
+
+```
+
+
+
+```{r}
+Newsposts %>%  ggplot(aes(REACTIONS,value))+
+  geom_boxplot(outlier.shape = NA )+
+  theme_bw()+
+  ggtitle("Figure2: REACTION PER ISSUE")+
+  
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+
+```{r}
+Newsposts %>% ggplot(aes(REACTIONS,value))+geom_boxplot(outlier.shape = NA)+theme_bw()+
+  ggtitle("Figure3: median Reactions Per Issue")+facet_wrap(~`ISSUE SALIENCE`)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),legend.position = "bottom")
+```
+
+
+```{r}
+library(forcats)
+d2=subset(Newsposts,REACTIONS=="LAUGH")
+Hat=subset(Newsposts,REACTIONS=="HEART")
+  
+d3=subset(d2,ACTORS %in% c("Zelenskyy","Putin","Citizens"))
+Hat=subset(Hat,ACTORS %in% c("Zelenskyy","Putin","Citizens"))
+
+d3=d3 %>%mutate(NewActors=fct_collapse(ACTORS,
+                              Political_Actors =c("Zelenskyy","Putin"),
+                                                  
+                              Citizens = c("Citizens")))
+
+Hat=Hat %>%mutate(NewActors=fct_collapse(ACTORS,
+                              Political_Actors =c("Zelenskyy","Putin"),
+                                                  
+                              Citizens = c("Citizens")))
+```
+
+
+```{r}
+ggplot(d3,aes(NewActors,value,  fill=NewActors))+geom_boxplot(outlier.shape = NA)+theme_bw()+ggtitle("Amount of Laughter emojis by Actors")+xlab("Actors")+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),legend.position = "none")
+
+ggplot(Hat,aes(NewActors,value,fill=NewActors))+geom_boxplot(outlier.shape = NA)+theme_bw()+ggtitle("Amount of HEART emojis by Actors")+xlab("Actors")+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),legend.position = "none")
+
+```
+
+## Hypothesis test
+_H1: News posts focused on political actors will have more laugh Reactions while citizen-focused news posts will have less_
+
+We conducted welch two sample t-test on the number of laughter emojies per per actor. The actors were grouped into two citizens and political actors.The sample was 41 while the mean of political actors was 1,281 and citizens 886. The difference was -395. Since the pvalue is less than 0.05, we reject the null hypothesis. 
+
+```{r}
+library(gtsummary)
+d3 %>% select(NewActors,value) %>% tbl_summary(by=NewActors,
+missing = "no",
+statistic = value ~ "{mean} ({sd})") %>%
+add_difference() %>%
+add_n() %>%
+add_stat_label() %>%
+bold_labels() %>%
+modify_header(list(label ~ "**Variable**", all_stat_cols() ~ "**{level}**")) %>%
+modify_spanning_header(all_stat_cols() ~ "**Actor**") %>%
+as_gt() %>%
+gt::tab_header(
+title = gt::md("**Table 1. Laugh vs Actor**"))
+```
+
+## H2
+_political posts will have more heat reactions than citizens posts_
+
+There was strong evidence that posts towards political actors were associated with heart reactions. with Pvalue <0.001.Hence we reject the null hypothesis that there is no difference in the number of heart reactions towards political and citizen actors. 
+
+```{r}
+
+Hat %>% select(NewActors,value) %>% tbl_summary(by=NewActors,
+missing = "no",
+statistic = value ~ "{mean} ({sd})") %>%
+add_difference() %>%
+add_n() %>%
+add_stat_label() %>%
+bold_labels() %>%
+modify_header(list(label ~ "**Variable**", all_stat_cols() ~ "**{level}**")) %>%
+modify_spanning_header(all_stat_cols() ~ "**Actor**") %>%
+as_gt() %>%
+gt::tab_header(
+title = gt::md("**Table 1. Heart vs Actor**"))
+
+```
+
+
+
+
+
+
