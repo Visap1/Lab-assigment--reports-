@@ -1,0 +1,582 @@
+---
+title: "Migration Book:T.test(Factual)"
+author: "Victor Saidi Phiri"
+header-includes:
+  - \usepackage{float}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{multicol}
+  - \usepackage{longtable}
+  - \usepackage{dcolumn}
+  
+date: \today{}
+output:
+  pdf_document:
+    fig_caption: true
+    number_sections: true
+classoption: 
+  - landscape
+geometry: margin=2cm
+---
+
+```{r setup, include=FALSE}
+require("knitr")
+require("summarytools")
+require("rmarkdown")
+require("kableExtra")
+require("haven")
+require("irr")
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message = FALSE, comment=NA,prompt = FALSE, cache = FALSE, results = 'asis',fig.width = 8,fig.height = 6,results = 'asis',tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+ 
+
+st_options(bootstrap.css     = FALSE,       # Already part of the theme so no need for it
+           plain.ascii       = FALSE,       # One of the essential settings
+           style             = "rmarkdown", # Idem.
+           dfSummary.silent  = TRUE,        # Suppresses messages about temporary files
+           footnote          = NA,          # Keeping the results minimalistic
+           subtitle.emphasis = FALSE)       # For the vignette theme, this gives better results.
+                                            # For other themes, using TRUE might be preferable.
+
+st_css()
+
+```
+
+
+```{r}
+library(readxl)
+library(dplyr)
+library(readxl)
+library(gtsummary)
+library(gt)
+library(Hmisc)
+library("condformat")
+library(forcats)
+library("labelled")
+```
+
+
+```{r}
+
+dat<- readRDS("CommChar2_MigrationBook_FactDataset.rds")
+
+dat[dat ==c(-1,-3)] <- NA
+ 
+```
+
+
+```{r helper functions}
+#ADD Labels
+
+add.label <- function(dat,prefix,q.text) {
+  for (i in 1:10) {
+  column_name <- paste0(prefix, i)
+  
+  dat = dat %>% dplyr::mutate(!!column_name := !!as.name(column_name))
+   dat = dat %>% set_variable_labels(!!column_name:= q.text)
+  }
+return(dat)
+}
+```
+
+# Overview
+This analysis used the 2019 LGPI and Factual dataset.In this analysis, we employed the unequal variance t-test (also known as Welch's t-test) to compare two distinct groups with respect to the variables High boundary, High barrier and population.
+
+
+```{r dat_prep}
+
+dat$fact_q23=if_else(dat$fact_q23=="No",0,1)
+label(dat$fact_q23)="Does the village/neighborhood have an
+advisory council or committee?"
+dat$fact_q24=as.numeric(dat$fact_q24)
+label(dat$fact_q24)="How many people are on the Village
+Advisory Council?"
+
+#-----fact_q26---------
+columns <- paste0("fact_q26_VACM", 1:10)
+# Calculate the proportion of females 
+dat$fact_q26 <- rowSums(dat[columns] == "Female", na.rm = TRUE)
+dat$fact_q26<- dat$fact_q26/dat$fact_q24
+label(dat$fact_q26)="share of women on advisory committee"
+
+#---fact_q27
+
+columns <- paste0("fact_q27_VACM", 1:10)
+# Specify the ethnic groups you want to sum
+ethnic_groups <- c("Bemba", "Chewa", "Lambya", "Mambwe", "Namwanga", "Ndali", "Ngoni", "Nkhonde", "Other (specify)", "Tonga", "Tumbuka")
+
+# Initialize a new column 'fact_q27' with zeros
+dat$fact_q27 <- 0
+
+# Loop through each ethnic group and add the row sums
+for (ethnic_group in ethnic_groups) {
+  dat$fact_q27 <- dat$fact_q27 + rowSums(dat[columns] == ethnic_group, na.rm = TRUE)
+}
+#share of seats
+dat$fact_q27<- dat$fact_q27/dat$fact_q24
+label(dat$fact_q27)="percentage of seats held by the largest ethnic group"
+ 
+#------fact_29------
+
+#Largest political party 
+#From household 2019 
+# Define the columns
+columns <- c("fact_q29_VACM1", "fact_q29_VACM1_O", "fact_q29_VACM2", "fact_q29_VACM2_O", "fact_q29_VACM3", "fact_q29_VACM3_O", "fact_q29_VACM4", "fact_q29_VACM4_O", "fact_q29_VACM5", "fact_q29_VACM5_O", "fact_q29_VACM6", "fact_q29_VACM6_O", "fact_q29_VACM7", "fact_q29_VACM7_O", "fact_q29_VACM8", "fact_q29_VACM8_O", "fact_q29_VACM9", "fact_q29_VACM9_O", "fact_q29_VACM10", "fact_q29_VACM10_O")
+
+# Specify the political parties you want to sum
+Largest_party <- c("Democratic Progressive Party (DPP)", "Malawi Congress Party (MCP)", "Patriotic Front (PF)","United Transformation Movement", "I don't feel close to a political party/Vote independent")
+
+# Initialize a new column 'fact_q29' with zeros
+dat$fact_q29 <- 0
+
+# Loop through each political party and add the row sums
+for (party in Largest_party) {
+  dat$fact_q29 <- dat$fact_q29 + rowSums(dat[columns] == party, na.rm = TRUE)
+}
+
+#share of seats
+dat$fact_q29<- dat$fact_q29/dat$fact_q24
+label(dat$fact_q29)="Share of seats held by the largest political party"
+ 
+#------Largest party based on factual 
+
+#Extract unique party names from the columns
+columns <- paste0("fact_q29_VACM", 1:10)
+pl.list <- dat %>%select(all_of(columns)) %>%
+  unlist() %>%
+  unique()
+pl.list <- pl.list[!is.na(pl.list) & pl.list != "Don't Know/Refuse to answer" & pl.list != "No party preference"]
+
+# Calculate the proportion of each party for each village
+for (party in pl.list) {
+  dat <- dat %>%
+    mutate(!!paste0(party) := rowSums(dat[columns] == party, na.rm = TRUE) / length(columns))
+}
+
+#Unique parties 
+parties<- c("Democratic Progressive Party (DPP)","United Transformation Movement",
+  "Malawi Congress Party (MCP)","People's Party (PP Malawi)",
+  "Patriotic Front (PF)","United Democratic Front (UDF)",
+  "United Party for National Development (UPND)","Alliance for Democracy (AFORD Malawi)")
+
+dat$FLargestPparty <- apply(dat[, parties], 1, function(row) {
+  max_population <- max(row)
+  if (max_population == 0) {
+    return("NA")
+  } else {
+    # Find all ethnic groups with the maximum population
+    largest_groups <- names(row[row == max_population])
+    # Incase of a tie keep the first entry
+    return(largest_groups[1])
+  }
+})
+
+label(dat$FLargestPparty)= "Largest party factual(created from data)"
+
+
+# Extract a copy of largest ethnic group: based on Factual
+#---------------------------------------------------
+#Add other specified values
+ dat$fact_q27_VACM1 <- if_else(dat$fact_q27_VACM1 == "Other (specify)",
+                             as.character(dat$fact_q27_VACM1_O),
+                             as.character(dat$fact_q27_VACM1))
+
+dat$fact_q27_VACM2 <- if_else(dat$fact_q27_VACM2 == "Other (specify)",
+                             as.character(dat$fact_q27_VACM2_O),
+                             as.character(dat$fact_q27_VACM2))
+
+dat$fact_q27_VACM3 <- if_else(dat$fact_q27_VACM3 == "Other (specify)",
+                             as.character(dat$fact_q27_VACM3_O),
+                             as.character(dat$fact_q27_VACM3))
+
+
+dat$fact_q27_VACM4 <- if_else(dat$fact_q27_VACM4 == "Other (specify)",
+                             as.character(dat$fact_q27_VACM4_O),
+                             as.character(dat$fact_q27_VACM4))
+
+
+dat$fact_q27_VACM5 <- if_else(dat$fact_q27_VACM5 == "Other (specify)",
+                             as.character(dat$fact_q27_VACM5_O),
+                             as.character(dat$fact_q27_VACM5))
+
+
+dat$fact_q27_VACM6 <- if_else(dat$fact_q27_VACM6 == "Other (specify)",
+                             as.character(dat$fact_q27_VACM6_O),
+                             as.character(dat$fact_q27_VACM6))
+
+dat$fact_q27_VACM7 <- if_else(dat$fact_q27_VACM7 == "Other (specify)",
+                             as.character(dat$fact_q27_VACM7_O),
+                             as.character(dat$fact_q27_VACM7))
+
+dat$fact_q27_VACM8 <- if_else(dat$fact_q27_VACM8 == "Other (specify)",
+                             as.character(dat$fact_q27_VACM8_O),
+                             as.character(dat$fact_q27_VACM8))
+
+
+dat$fact_q27_VACM9 <- if_else(dat$fact_q27_VACM9 == "Other (specify)",
+                             as.character(dat$fact_q27_VACM9_O),
+                             as.character(dat$fact_q27_VACM9))
+
+dat$fact_q27_VACM10 <- if_else(dat$fact_q27_VACM10 == "Other (specify)",
+                             as.character(dat$fact_q27_VACM10_O),
+                             as.character(dat$fact_q27_VACM10))
+
+
+
+# Define the columns containing ethnic group names
+columns <- paste0("fact_q27_VACM", 1:10)
+
+# Get unique ethnic groups
+unique_ethnic_groups <- dat %>%
+  select(all_of(columns)) %>%
+  unlist() %>%
+  unique()
+# Remove unwanted values from eth_list
+unique_ethnic_groups <- unique_ethnic_groups[!is.na(unique_ethnic_groups) & unique_ethnic_groups != "Other (specify)" & unique_ethnic_groups != "Does not identify in those terms (Malawian only)"]
+
+# Calculate the proportion of each ethnic group for each village and add them as new columns
+for (ethnic_group in unique_ethnic_groups) {
+  dat <- dat %>%
+    mutate(!!paste0(ethnic_group) := rowSums(dat[columns] == ethnic_group, na.rm = TRUE) / length(columns))
+}
+
+
+# select new ethnic groups
+Ethinic <- c("Lomwe", "Tumbuka", "Chewa", "Ngoni", "Lambya", "Lungu", "Mambwe", "Namwanga", "Bemba")
+
+# Find the largest ethnic group for each village
+dat$LargestEthnicGroup <- apply(dat[, Ethinic], 1, function(row) {
+  max_population <- max(row)
+  if (max_population == 0) {
+    return("NA")
+  } else {
+    # Find all ethnic groups with the maximum population
+    largest_groups <- names(row[row == max_population])
+    # Incase of a tie keep the first entry
+    return(largest_groups[1])
+  }
+})
+
+label(dat$LargestEthnicGroup)="Largest ethnic group based on factual data"
+
+#-----fact_q31------
+#there no number 10
+col_names <- c("fact_q31_VACM1","fact_q31_VACM2","fact_q31_VACM3","fact_q31_VACM4","fact_q31_VACM5", "fact_q31_VACM6","fact_q31_VACM7","fact_q31_VACM8","fact_q31_VACM10")
+dat$fact_q31 <- rowSums(dat[col_names] == "Yes", na.rm = TRUE)
+dat$fact_q31<- dat$fact_q31/dat$fact_q24
+
+label(dat$fact_q31)="Is VACM originally from this village?"
+ 
+
+#------fact_q32------
+columns <- paste0("fact_q32_VACM", 1:10)
+# Compute the average time served across all members
+dat$fact_q32 <- rowMeans(dat[, columns], na.rm = TRUE)
+
+label(dat$fact_q32)="Average time spent in the committe by each member" 
+
+
+#-----
+dat$fact_q56=if_else(dat$fact_q56=="Yes",1,0)
+label(dat$fact_q56)="Does this village have a: Health Center"
+
+dat$fact_q57=if_else(dat$fact_q57=="Yes",1,0)
+label(dat$fact_q57)="Does this village have a: Village Bank/Saving and Loan Group"
+dat$fact_q58=if_else(dat$fact_q58=="Yes",1,0)
+label(dat$fact_q58)="Does this village have a: Community Watch"
+dat$fact_q60=if_else(dat$fact_q60=="Yes",1,0)
+label(dat$fact_q60)="Does this village have a: Maternity Center"
+dat$fact_q61=if_else(dat$fact_q61=="Yes",1,0)
+label(dat$fact_q61)="Does this village have a: Pharmacy or Medicine Dispensary"
+dat$fact_q62=if_else(dat$fact_q62=="Yes",1,0)
+label(dat$fact_q62)="Does this village have a: Public place to access the internet"
+dat$fact_q63=if_else(dat$fact_q63=="Yes",1,0)
+label(dat$fact_q63)="Does this village have a: Political PartyOffices"
+dat$fact_q72=if_else(dat$fact_q72=="Yes",1,0)
+label(dat$fact_q72)="Does the local school have a Parent Teacher Association?"
+dat$fact_q73=if_else(dat$fact_q73=="Yes",1,0)
+
+label(dat$fact_q73)="Is there a local school management committee for the closest primary school (even if not in this village)?"
+
+dat$fact_q87=if_else(dat$fact_q87=="Yes",1,0)
+label(dat$fact_q87)="Are any of the members of thevillage/community development
+committee from this village/neighborhood?"
+dat$fact_q93=if_else(dat$fact_q93=="Meters",1,0)
+
+label(dat$fact_q93)="Was this in meters or kilometers?"
+
+#----------------------------
+#ADD missing labels fact_q33
+#----------------------------
+q.text="Is VACM related to you in any of the following ways?"
+dat=add.label(dat,prefix ="fact_q33_VACM1_",q.text = q.text)
+dat=add.label(dat,prefix ="fact_q33_VACM2_",q.text = q.text)
+dat=add.label(dat,prefix ="fact_q33_VACM3_",q.text = q.text)
+dat=add.label(dat,prefix ="fact_q33_VACM4_",q.text = q.text)
+dat=add.label(dat,prefix ="fact_q33_VACM5_",q.text = q.text)
+dat=add.label(dat,prefix ="fact_q33_VACM6_",q.text = q.text)
+dat=add.label(dat,prefix ="fact_q33_VACM7_",q.text = q.text)
+dat=add.label(dat,prefix ="fact_q33_VACM8_",q.text = q.text)
+dat=add.label(dat,prefix ="fact_q33_VACM9_",q.text = q.text)
+dat=add.label(dat,prefix ="fact_q33_VACM10_",q.text = q.text)
+
+
+#REMOVE(EMPTY)
+
+#fact_q33_VACM4_O
+# fact_q33_VACM5_O
+#fact_q33_VACM6_O
+#fact_q33_VACM7_O
+#fact_q33_VACM8_O
+#fact_q33_VACM9_O
+ 
+label(dat$LargestPParty)="Largest Party based on 2019 HH data"
+label(dat$LargestGroup)="Largest Ethnic group based on HH data"
+
+datlabel = Hmisc::label(dat)#extract labels
+
+#Select columns for T_test
+df= dat%>% select(fact_q23,fact_q24,fact_q26,
+                       fact_q27,fact_q29,fact_q31,fact_q32,
+                     fact_q33_VACM1_1:fact_q33_VACM10_10,fact_q56:fact_q58,
+                     fact_q60:fact_q63,
+                     fact_q72,fact_q73,fact_q87,
+                     fact_q93,fact_q78_3,fact_q78_4,fact_q79_1:fact_q79_8,
+                     fact_q80_1:fact_q80_4,
+                     fact_q92,fact_q94,
+                     HighBoundary,HighBarrier,highPopulation)
+
+
+
+df=subset(df,
+          select =-c(fact_q33_VACM1_O,fact_q33_VACM2_O,
+                    fact_q33_VACM3_O,fact_q33_VACM4_O,
+                    fact_q33_VACM5_O,fact_q33_VACM6_O,
+                    fact_q33_VACM7_O,fact_q33_VACM8_O,fact_q33_VACM9_O))
+
+
+#data for reliability test
+Test_df=dat %>% select(LargestGroup,
+                   LargestPParty,FLargestPparty,LargestEthnicGroup)
+
+datlabel = datlabel[which(names(datlabel) %in% colnames(dat))]
+Hmisc::label(dat) = as.list(datlabel[match(names(dat), names(datlabel))])
+
+```
+
+
+
+# Factual by High Barrier
+
+```{r FactBarrier}
+datlabel = Hmisc::label(dat)
+Bar_dat=subset(df,select = -c(HighBoundary))
+Barlabel = datlabel[which(names(datlabel) %in% colnames(Bar_dat))]
+Hmisc::label(Bar_dat) = as.list(Barlabel[match(names(Bar_dat), names(Barlabel))])
+
+Barrier<-Bar_dat%>% 
+  tbl_summary(
+    by = HighBarrier,
+    missing = "no",
+    statistic = all_continuous() ~ "{mean}",digits = all_continuous() ~ 3,
+    type = everything() ~ 'continuous'
+  ) %>%
+  add_difference() %>%
+  add_n() %>%
+  add_stat_label() %>%
+  bold_labels() %>%
+  modify_header(
+    label ~ "**Variable**",
+    all_stat_cols() ~ "**{level}**"
+  ) %>%
+  modify_spanning_header(all_stat_cols() ~ "**Barrier**")
+BarrierTable <- as.data.frame(Barrier$table_body)  
+BarrierTable = subset(BarrierTable, select = c("variable","label","n","test_name","stat_1","stat_2","estimate","p.value"))
+
+colnames(BarrierTable) = c("Variable","Question","Sample Size","Test","Mean Low","Mean High","Difference","pvalue")
+
+BarrierTable1=BarrierTable%>%filter(as.numeric(`Mean Low`) > 0 & as.numeric(`Mean High`) > 0)
+#EXPORT FOR Pdat
+BarrierTable1 %>%
+  kbl(booktabs = T,longtable = T, linesep = "",caption= "Municiple variables by HighBarrier")%>% 
+  column_spec(2, width = "10em") %>% 
+  column_spec(8, color = "white", background = if_else(is.na(BarrierTable1$pvalue), "black", 
+                                              if_else(BarrierTable1$pvalue < 0.05, "green","#C1BBB5")))%>% kable_styling(latex_options = c("hold_position", "repeat_header"))
+
+```
+
+
+```{r Fact Barrier excel}
+
+barrier.excel <-
+       condformat(BarrierTable1) %>%
+    rule_fill_discrete('pvalue', expression=cut(BarrierTable1$pvalue, breaks=c(0,0.05,1), include.lowest=T, labels=F), colours=c('1'='green', '2'='red'))
+    
+ condformat2excel(barrier.excel, 'Factchar_barrier_fact.xlsx')
+```
+
+\newpage
+
+# Factual vs HighBoundary 
+
+```{r factBoundary}
+Bound_dat=subset(df,select = -c(HighBarrier))
+Boundlabel = datlabel[which(names(datlabel) %in% colnames(Bound_dat))]
+Hmisc::label(Bound_dat) = as.list(Boundlabel[match(names(Bound_dat), names(Boundlabel))])
+
+
+Boundary <-  Bound_dat%>%
+  tbl_summary(
+    by = HighBoundary,
+    missing = "no",
+    statistic = all_continuous() ~ "{mean}",digits = all_continuous() ~ 3,
+    type = everything() ~ 'continuous'
+  ) %>%
+  add_difference() %>%
+  add_n() %>%
+  add_stat_label() %>%
+  bold_labels() %>%
+  bold_p(t = 0.05) %>%  
+  modify_header(
+    label ~ "**Variable**",
+    all_stat_cols() ~ "**{level}**"
+  ) %>%
+  modify_spanning_header(all_stat_cols() ~ "**Boundary**") 
+ 
+BoundaryTable <- as.data.frame(Boundary$table_body)  
+BoundaryTable = subset(BoundaryTable, select = c("variable","label","n","test_name","stat_1","stat_2","estimate","p.value"))
+
+colnames(BoundaryTable) = c("Variable","Question","Sample Size","Test","Mean Low","Mean High","Difference","pvalue")
+
+BoundaryTable1=BoundaryTable%>%filter(as.numeric(`Mean Low`) > 0 & as.numeric(`Mean High`) > 0)
+
+BoundaryTable1 %>%
+  kbl(booktabs = T,longtable = T, linesep = "",caption= "Municiple variables by HighBoundary")%>% 
+  column_spec(2, width = "10em") %>% 
+  column_spec(8, color = "white", background = if_else(is.na(BoundaryTable1$pvalue), "black", 
+                                              if_else(BoundaryTable1$pvalue < 0.05, "green","#C1BBB5")))%>% kable_styling(latex_options = c("hold_position", "repeat_header"))
+
+ 
+```
+
+
+```{r factBoundary Excel export}
+
+
+#EXPORT TO EXCEL
+boundary.excel <-
+    condformat(BoundaryTable1) %>%
+    rule_fill_discrete('pvalue', expression=cut(BoundaryTable1$pvalue, breaks=c(0,0.05,1), include.lowest=T, labels=F), colours=c('1'='green', '2'='red'))
+    
+condformat2excel(boundary.excel, 'Factchar_boundary_Fact.xlsx')
+
+
+```
+
+\newpage
+
+#Fact Highpopulation 
+
+```{r factHighPop}
+Pop_dat=subset(df,select = -c(HighBoundary,HighBarrier))
+Populationlabel = datlabel[which(names(datlabel) %in% colnames(Pop_dat))]
+Hmisc::label(Pop_dat) = as.list(Populationlabel[match(names(Pop_dat), names(Populationlabel))])
+
+pop<-Pop_dat%>%
+  tbl_summary(
+    by =highPopulation,
+    missing = "no",
+    statistic = all_continuous() ~ "{mean}",digits = all_continuous() ~ 3,
+    type = everything() ~ 'continuous'
+  ) %>%
+  add_difference() %>%
+  add_n() %>%
+  add_stat_label() %>%
+  bold_labels() %>%
+  bold_p(t = 0.05) %>% 
+  modify_header(
+    label ~ "**Variable**",
+    all_stat_cols() ~ "**{level}**"
+  ) %>%
+  modify_spanning_header(all_stat_cols() ~ "**highPopulation**")
+
+PopulationTable <- as.data.frame(pop$table_body)  
+PopulationTable = subset(PopulationTable, select = c("variable","label","n","test_name","stat_1","stat_2","estimate","p.value"))
+
+colnames(PopulationTable) = c("Variable","Question","Sample Size","Test","Mean Low","Mean High","Difference","pvalue")
+
+
+# Export to Pdat
+
+PopulationTable1 =PopulationTable %>%filter(as.numeric(`Mean Low`) > 0 & as.numeric(`Mean High`) > 0)
+PopulationTable1%>%
+  kbl(booktabs = T,longtable = T, linesep = "",caption= "Municiple variables by HighPopulation")%>%
+  column_spec(2, width = "10em") %>% 
+  column_spec(8, color = "white", background = if_else(is.na(PopulationTable1$pvalue), "black", 
+                                              if_else(PopulationTable1$pvalue < 0.05, "green","#C1BBB5"))) %>% kable_styling(latex_options = c("hold_position", "repeat_header"))
+ 
+```
+
+
+```{r factHighPop Excel export}
+#EXPORT TO EXCEL
+highpop.excel <-
+    condformat(PopulationTable1) %>%
+    rule_fill_discrete('pvalue', expression=cut(PopulationTable1$pvalue, breaks=c(0,0.05,1), include.lowest=T, labels=F), colours=c('1'='green', '2'='red'))
+    
+condformat2excel(highpop.excel, 'Factchar_highpop_muni.xlsx')
+
+```
+
+
+
+```{r Reliability check}
+ 
+Test_df1=Test_df%>% select(LargestPParty,FLargestPparty)
+Test_df2=Test_df %>% select(LargestGroup,LargestEthnicGroup)
+
+Party_Results=kappa2(Test_df1, "unweighted")
+kappa2(Test_df2, "unweighted")
+
+
+# Define the updated data
+data2 <- data.frame(
+  Parameter = c("Subjects", "Raters", "Kappa", "z-Score (z)", "p-Value"),
+  Value = c(124, 2, 0.486, 11.4, 0)
+)
+ 
+
+
+data <- data.frame(
+  Parameter = c("Subjects", "Raters", "Kappa", "z-Score (z)", "p-Value"),
+  Value = c(124, 2, 0.247, 7.19, 6.25e-13)
+)
+
+kable(data,caption = "Inter-rater Reliability between 2019 HH Largest Party and Fuctual")
+
+kable(data2,caption = "Inter-rater Reliability between 2019 HH Largest Ethnic and Fuctual")
+```
+
+- Moderate agreement between Largest party coded using 2019 HH data and directly from fuctual data.with pvalue less than 0.05.
+
+- There was a much stronger reliability on Largest ethnic group with 0.486 and a pvalue less than the significant level. 
+
+
+
+
+\newpage
+
+# Summary Table 
+
+
+```{r Summary Table}
+df$LargestGroup=Test_df$LargestGroup
+df$LargestPParty=Test_df$LargestPParty
+df$FLargestPparty=Test_df$FLargestPparty
+df$LargestEthnicGroup=Test_df$LargestEthnicGroup
+
+mydat = dfSummary(df,style = "multiline",graph.col = FALSE, 
+           valid.col = FALSE, na.rm = TRUE,headings = FALSE,tmp.img.dir = "/tmp",max.string.width = 100,max.distinct.values = 100,labels.col = TRUE,varnumbers = FALSE)
+mydat$Variable = gsub(pattern = "labelled, ",replacement = "",x = mydat$Variable)
+mydat
+```
+
