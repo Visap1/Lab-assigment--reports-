@@ -1,0 +1,350 @@
+---
+title: 'SIMM61: Labs'
+author: "Victor Saidi Phiri"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+This R Markdown file will help you to follow the lab sessions and give you the code. In **session 1** we will load the data, transform it, and look at some descriptive statistics. **Session 2** covers bivariate and multivariate regression analysis. In **session 3** we learn how to add interaction terms and check the model assumptions. Finally, in **session 4** we present the model output in tables and visualize our findings. 
+
+
+# LAB SESSION 1
+We start by setting the work directory and load the necessary packages. 
+
+```{r}
+# Get the working directory
+getwd()
+
+# Setting the working directory
+setwd("/Users/med-ak4/Documents/Undervisning/SIMM61")
+
+# Load packages
+library(tidyverse)
+library(haven)
+
+```
+
+First, we need to load the data that we will be working with and save it as an R object. The package *haven* has functions to import SPSS, Stata and SAS files. If you are unsure how to open your file, you can find it manually under "Files" and click on it. Choose "Import dataset" and RStudio will give you a code preview that you can use. In the code chunk below, we import data from ESS round 7 in .sav format. 
+
+```{r}
+# Import ESS-data in .sav format
+ESS7 <- read_sav("ESS7e02_2.sav")
+
+# Look at the data
+view(ESS7)
+```
+
+Often, you only wish to study specific group in a sample, for example a certain age category or participants from a particular country. The *filter* function allows you to filter out rows that meet certain criteria. In our case, we only want to use the Swedish cases. 
+
+```{r}
+# Filter Swedish cases
+ESS7_SE <- ESS7 %>% 
+  filter(cntry == "SE")
+```
+
+When we work with a dataframe in R, it is important that the variables are correctly assigned as either categorical or numeric. *mutate* categorical variables into factors (*as_factor*) and continuous variables into numeric ones (*as.numeric*). If you are unsure about some variables, you can look at the meta information using, for example, the *head* function. Within the mutate function, you can also rename the variables in a way that makes sense to you. Finally, you can *select* the variables that you are interested in, in order to get a smaller and more user friendly dataset to work with. 
+
+```{r}
+# Inspect a variable
+head(ESS7_SE$eduyrs)
+
+# Mutate and select variables
+ESS7_Selected <- ESS7_SE %>% 
+  mutate(age = as.numeric(agea), 
+         gender = as_factor(gndr), 
+         born_se = as_factor(brncntr), 
+         eduyrs = as.numeric(eduyrs),
+         manage_income = as_factor(hincfel), 
+         domicil = as_factor(domicil), 
+         imbleco = as.numeric(imbleco), 
+         imwbcrm = as.numeric(imwbcrm), 
+         imwbcnt = as.numeric(imwbcnt), 
+         imueclt = as.numeric(imueclt), 
+         imtcjob = as.numeric(imtcjob)) %>% 
+  select(age,
+         gender,
+         born_se,
+         eduyrs,
+         manage_income,
+         domicil, 
+         imbleco,
+         imwbcrm,
+         imwbcnt,
+         imueclt, 
+         imtcjob)
+
+# Look at the data
+view(ESS7_Selected)
+```
+
+Some of you might want to use an index as the outcome variable. An index is constructed by summing ordinal variables in order to create a composite measure that we treat as a continuous variable. 
+**Note:** 
+1) All variables must be coded *in the same direction* (otherwise: reverse the ones that are not)
+2) All variables must be coded *on the same scale* (otherwise: rescale the ones that are not)
+
+
+In order to measure attitudes towards immigration, we can sum the following five variables from ESS, with responses to statements pertaining immigration and its effects. Responses range from 0 to 10. Below, the index is rescaled from 0 to 100 for ease of interpretation. The variable is reverse so that higher values indicate a more negative view on immigration. 
+
+```{r}
+# Create index variable
+ESS7_Selected <- ESS7_Selected %>% 
+  mutate(index = (100 - (imbleco + imwbcrm + imwbcnt + imueclt + imtcjob)*2))
+
+```
+
+To check the reliability of the index, we can perform a Cronbach's Alpha test (function *alpha* from the *psych* package).
+
+```{r}
+# Reliability Analysis of Index
+library(psych)
+
+test_index <- data.frame(ESS7_SE$imbleco, 
+                         ESS7_SE$imwbcrm, 
+                         ESS7_SE$imwbcnt, 
+                         ESS7_SE$imueclt, 
+                         ESS7_SE$imtcjob)
+
+alphaindex <- alpha(test_index)
+summary(alphaindex)
+```
+
+Look at summary statistics and plots for the variables. The focal independent and dependent variables are of special importance. 
+
+```{r}
+# Plot focal X
+ggplot(ESS7_Selected, aes(eduyrs)) + 
+  geom_histogram() +
+  theme_classic() + 
+  ggtitle("Focal Independent Variable")
+
+# Summary stats for focal X 
+summary(ESS7_Selected$eduyrs)
+
+# Plot focal Y
+ggplot(ESS7_Selected, aes(index)) + 
+  geom_histogram() +
+  theme_classic() + 
+  ggtitle("Focal Dependent Variable")
+
+# Summary stats for focal X 
+summary(ESS7_Selected$index)
+```
+
+A nice way to get an overview is to *skim* the data (provides a display of summary statistics for the whole dataset).
+
+```{r}
+library(skimr)
+
+skim(ESS7_Selected) 
+```
+
+
+# LAB SESSION 2
+First, we want to examine the bivariate relationship between our two focal variables. 
+
+```{r}
+# Bivariate model 
+mod1 <- lm(index ~ eduyrs, 
+           data = ESS7_Selected)
+
+# Model summary
+summary(mod1)
+```
+
+Now we want to add control variables to the model, as part of an exclusionary strategy. Note: factors are automatically included as dummies.
+
+```{r}
+# Model with control variables
+mod2 <- lm(index ~ eduyrs + 
+             gender + 
+             age + 
+             born_se, 
+           data = ESS7_Selected)
+
+summary(mod2)
+```
+
+Sometimes there is a need to change the levels in the categorical variables. For example, we might not need all the levels in a categorical variable, and want to reduce it into a dummy. The package *forcats* (included in tidyverse) has a lot of functions that provides tools for working with factors. In the code chunk below, we use *fct_collapse* in order to collapse the levels of a factor into a lower number of defined groups. 
+
+```{r}
+# Reduce the number of categories in a factor
+ESS7_Selected <- ESS7_Selected %>% 
+  mutate(domicil = fct_collapse(domicil, 
+                                BC = c("A big city",
+                                       "Suburbs or outskirts of big city"), 
+                                Other = c("Town or small city", 
+                                          "Country village", 
+                                          "Farm or home in countryside")),
+         manage_income = fct_collapse(manage_income, 
+                                      Manage = c("Living comfortably on present income",
+                                                 "Coping on present income"),
+                                      Not = c("Difficult on present income",
+                                              "Very difficult on present income"))) 
+```
+
+We can also change the reference category of a dummy variable. In R, we set the reference category by re-ordering the levels and placing the reference first. 
+
+```{r}
+# Relevel to set reference category
+ESS7_Selected <- ESS7_Selected %>% 
+  mutate(domicil = fct_relevel(domicil, "Other"))
+```
+
+Then we add the new dummies to the model!
+
+```{r}
+# Model with dummies
+mod3 <- lm(index ~ eduyrs + 
+             gender + 
+             age + 
+             born_se + 
+             domicil + 
+             manage_income,
+           data = ESS7_Selected)
+
+summary(mod3)
+```
+
+# LAB SESSION 3
+To test for moderation, we can add interaction terms. We can add this using the following code:
+
+```{r}
+# Model with interaction effects
+mod4 <- lm(index ~ eduyrs + 
+             gender + 
+             age + 
+             born_se + 
+             domicil + 
+             manage_income + 
+             eduyrs*gender, #this is the interaction term!
+           data = ESS7_Selected)
+
+summary(mod4)
+
+```
+
+When we have our final model, we check the model assumptions. The *plot* function includes several diagnostic plots for models. You can look at all of them at once using the following code: 
+
+```{r}
+# Diagnostic plots
+plot(mod4)
+```
+
+**Note:** for examples on how to interpret the plots, visit: https://data.library.virginia.edu/diagnostic-plots/ 
+
+If you want to examine a certain plot, you can specify this in the code. First, we want to look for outliers. 
+
+```{r}
+# Detecting influential outliers
+plot(mod4, which = 5)
+
+```
+
+According to the graph, no observation seems to be an influential outlier. However, if we would detect some potentially problematic cases, we could figure out which ones they were by ranking the top cases with the highest Cook's distance.
+
+```{r}
+# Display the cases with the highest numbers of Cook's D
+CooksD <- cooks.distance(mod4)
+sort(CooksD, decreasing = TRUE) %>% head()
+```
+
+To test the assumption of linearity, we look at the residuals vs fitted plot. 
+
+```{r}
+# Linearity
+plot(mod4, which = 1)
+```
+To test for the absence of heteroscedasticity, we examine the scale-location plot. 
+
+```{r}
+# Homogeneity of variance
+# (Resiudals are independent and homoscedastic)
+plot(mod4, which = 3)
+```
+
+Finally, to check the assumption of normality of the residuals, we look at the normal q-q plot. 
+```{r}
+# Normality of the residuals
+plot(mod4, which 2)
+```
+
+Last, we want an absence of multicollinearity in the model. There are several ways to test this. One is to examine the VIF (Variance Inflation Factor) values, where a rule of thumb is that values exceeding 4 requires further investigation. 
+
+```{r}
+# Absence of multicollinearity
+library(car)
+vif(mod4)
+```
+
+# LAB SESSION 4
+We now have our final model and want to present it in a nice way to our readers. *visreg* visualizes regression model. 
+
+```{r}
+library(visreg)
+
+visreg(mod4, "eduyrs", # specifying x-variable to visualize
+       ylab = "Index", 
+       xlab = "Years of Education", 
+       gg = TRUE, # creating a ggplot
+       band = TRUE) + 
+  theme_classic() + 
+  ggtitle("Final model")
+
+```
+
+We plot moderation by specifying a third variable and dividing the plot into cross-sections. 
+
+```{r}
+# Visualizing model with interaction
+visreg(mod4, "eduyrs", by = "gender", 
+                      overlay = TRUE,
+                      ylab = "Index", 
+                      xlab = "Years of Eduaction",
+                      legend = FALSE,
+                      gg = TRUE, 
+       band = FALSE) + 
+  theme_classic() + 
+  ggtitle("Final model: The interaction effect of education and gender")
+
+```
+
+There are many different ways to create nice regression tables in R. *modelsummary* is really easy to use. 
+
+```{r}
+library(modelsummary)
+msummary(list(mod1, mod2, mod3, mod4), # List the models to include
+         stars = TRUE)
+```
+
+If you want to use RMarkdown when writing your paper, there are several packages that provide publication ready tables. 
+
+```{r results = "asis"}
+library(stargazer)
+stargazer(mod3, mod4, 
+                     type = "html",
+                     align = TRUE,
+                     single.row = TRUE,
+                     df = FALSE,
+                     star.cutoffs = c(0.05, 0.01, 0.001),
+                     intercept.bottom = FALSE,
+                     dep.var.labels = "Index",
+                     covariate.labels = c("Constant",
+                                          "Years of Education",
+                                          "Gender: Female",
+                                          "Age",
+                                          "Not Born in Country",
+                                          "Domicile: Big City",
+                                          "Manage on Income",
+                                          "Education*Gender"),
+                     title = "Table 3. Regression Results Model 3-4",
+                     keep.stat = c("n","adj.rsq", "f"),
+                     no.space = TRUE,
+                     out = "models.htm")
+
+```
+
