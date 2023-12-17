@@ -1,0 +1,214 @@
+#..................................................................................................
+# 
+# SIMP56 Introduction to Social Network Analysis
+# 
+# Tutorial 1 - Introduction to network data in R
+# Created:  07-03-2022
+
+# 1. IMPORTING NETWORK DATA ----
+# 1.1. Load main library for today
+library(network)
+
+
+# 1.2. Example with a data set in the package ----
+# Marriage and business ties among Florentine families. Load data set.
+data("flo")
+
+
+# Check how the network's adjacency matrix looks like
+flo
+
+
+# Is the network directed or undirected? Look at the symmetry of the adjacency matrix
+flo - t(flo)
+rowSums(flo - t(flo))
+
+
+# Convert to an object of class "network"
+flo_net <- network(flo, directed=FALSE)   # Also possible to obtain with: as.network(flo, directed=FALSE)
+
+
+# Plot the Florentine network
+plot(flo_net, displaylabels=TRUE)
+
+
+# Print general network properties
+print(flo_net)
+
+# ...you can also get the same information by using
+flo_net
+network.vertex.names(flo_net) ## shows the vertex names
+
+
+# Get a vector with node labels (i.e. vertex names)
+network.vertex.names(flo_net)
+
+
+# Get the number of nodes and number of edges
+network.size(flo_net)
+
+network.edgecount(flo_net)
+
+
+# Retrieve adjacency matrix from "network" object
+as.sociomatrix(flo_net)
+
+flo_net[1, 2]   ## display edge value between nodes 1 and 2
+flo_net[2, ]    ## display edge values for node 2
+
+
+# Get the nearest neighborhood of a given node
+get.neighborhood(flo_net, 1)
+
+# Are two nodes adjacent?
+is.adjacent(flo_net, 9, 1)
+is.adjacent(flo_net, 9, 4)
+
+# Create the edge list
+flo_net_edgelist <- as.matrix(flo_net, matrix.type="edgelist")
+flo_net_edgelist
+
+# You can also get the edge list from network summary
+summary(flo_net)
+
+
+# Now it is your turn! Exercise 1.1
+# In the same network, compare the neighborhoods of the Strozzi and Barbadori families.
+
+
+
+
+# 1.3. Importing network files
+# Read a data set in Pajek project format ".paj"
+tech_net_base <- read.paj("hiTech/Hi-tech.paj")
+
+
+# The resulting object is a list of objects corresponding to the original files.
+# The first object in the list is the "network" object
+tech_net_base[[1]]$`Hi-tech.net`
+
+
+# Save the "network" as an object and check its class
+tech_net <- tech_net_base[[1]]$`Hi-tech.net`
+
+class(tech_net)
+
+
+# The second object in the list contains the node attribute for unionisation stance
+# (Key: 0-no opinion/not known, 1-supporters, 2-opposed, 3-top managers (opposed) )
+tech_net_union <- tech_net_base[[2]]$`Hi-tech_union.clu`
+
+
+# 1.4. Node and edge attributes ----
+# Get node attributes
+list.vertex.attributes(tech_net)
+
+
+# Set node attribute to newly created union vector, and check
+set.vertex.attribute(tech_net, "union", tech_net_union)
+list.vertex.attributes(tech_net)
+
+
+# Get edge attributes (you can use "set.edge.attribute" to assign new values)
+list.edge.attributes(tech_net)
+
+
+# Now it is your turn! Exercise 1.2 ----
+# Plot the Hi-tech network, show labels and use the vertex.col option to color by union stance, 
+#  mode="circle" for a circular layout, and label.pos=1 for labels below the node
+
+
+
+
+#..................................................................................................
+# 2. SAVING DATA ----
+# 2.1. Save R object/s to a separate file ----
+# Example: save(object1, file="data1.RData")
+save(tech_net, file="technet.RData")
+
+
+# One can save multiple objects to the same file
+save(object1, object2, file="data1-2.RData")
+
+
+# Load the object/s
+load("data1.RData")
+
+
+# Now your turn! Exercise 1.3 ----
+# Save the Florentine network as a separate .RData file
+
+
+
+
+#..................................................................................................
+# 3. TRANSFORMING NETWORK DATA ----
+# 3.1. Saving from "network" ----
+
+# 3.2. The R package "intergraph" ----
+# Load package
+library(intergraph)
+
+# Transform the Hi-tech network into an "igraph" object, and check class of the result
+tech_net_igraph <- asIgraph(tech_net)
+
+class(tech_net_igraph)
+
+
+# Transform back to "network" class
+tech_net_igraph_back <- asNetwork(tech_net_igraph)
+
+class(tech_net_igraph_back)
+
+
+# Transform the Hi-tech network into into a list of two R data frames (one for nodes, one for edges)
+tech_net_igraph_DF <- asDF(tech_net_igraph)
+
+tech_net_igraph_DF_nodes <- tech_net_igraph_DF[[2]]
+
+
+# We can assign labels to the newly created vector
+tech_net_igraph_DF_nodes$union <- factor(tech_net_igraph_DF_nodes$union, 
+                                         levels=c(0:3), 
+                                         labels=c("No opinion/not known", "Supporters", 
+                                                  "Opposed", "Top managers (opposed)")
+                                         )
+
+head(tech_net_igraph_DF_nodes)
+
+tech_net_igraph_DF_edges <- tech_net_igraph_DF[[1]]
+
+
+
+#..................................................................................................
+# 4. SAVING THE WORKSPACE ----
+# 4.1. Save image file of entire workspace ----
+save.image(file="SIMP56_Day1.RData")
+
+# The reverse function to load an image file is:
+load.image(file="SIMP56_Day1.RData")
+
+
+#..................................................................................................
+# REFERENCES ----
+# 
+# Pajek datasets: 
+#  http://vlado.fmf.uni-lj.si/pub/networks/data/
+#
+# Datasets from book "Exploratory Social Network Analysis with Pajek": 
+#  http://vlado.fmf.uni-lj.si/pub/networks/data/esna/default.htm
+#
+# Tutorial article for R package "network":
+#  Butts, Carter T. 2008. "Network: A Package for Managing Relational Data in R." Journal of Statistical 
+#  Software 24(2): 1-36.
+# 
+# Online documentation for R package "network":
+#  http://www.rdocumentation.org/packages/network
+#
+# Tutorial for R package "intergraph":
+#  http://mbojan.github.io/intergraph/howto.html
+# 
+# Online documentation for R package "intergraph":
+#  http://www.rdocumentation.org/packages/intergraph
+#
+# Mondani, H. (2020) Lund Autumn Methods Workshops 2020
