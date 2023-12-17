@@ -1,0 +1,675 @@
+---
+title: "Factors predicting Maths score"
+author: "Victor S Phiri"
+date: "`r Sys.Date()`"
+output:
+  word_document: default
+  keep_tex: yes
+  pdf_document: default
+latex_engine: pdflatex
+toc: yes
+float: 2
+---
+
+
+```{r setup }
+library(haven)
+library(skimr)
+library(Amelia)
+library(tidyverse)
+library(tidyr)
+library(psychotools)
+library(psych)
+library(dplyr)
+library(ggplot2)
+library(faoutlier)
+library(sem)
+library(mvtnorm)
+library(parallel)
+library(GGally) # for ggcorr	
+library(corrr) # network_plot	
+library(ggcorrplot) # for ggcorrplot	
+library(FactoMineR) # multiple PCA functions	
+library(factoextra) # visualisation functions for PCA (e.g. fviz_pca_var)	
+library(moments)
+library(EFAtools)
+library(GPArotation)
+library(summarytools)
+library(sjPlot)
+library(QuantPsyc)
+
+knitr::opts_chunk$set(
+	echo = FALSE,
+	fig.height = 6,
+	fig.width = 8,
+	message = FALSE,
+	warning = FALSE,
+	cache = FALSE,
+	comment = NA,
+	prompt = FALSE,
+	results = "asis",
+	tidy = TRUE,
+	tidy.opts = list(width.cutoff = 60)
+)
+ 
+```
+
+#### Load custom function
+
+This will be used to visualise the results of the EFA
+
+```{r eval=FALSE, include=FALSE}
+
+fviz_loadnings_with_cor <- function(mod, axes = 1, loadings_above = 0.4){	
+  require(factoextra)	
+  require(dplyr)	
+  require(ggplot2)	
+if(!is.na(as.character(mod$call$call)[1])){	
+  if(as.character(mod$call$call)[1] == "PCA"){	
+  contrib_and_cov = as.data.frame(rbind(mod[["var"]][["contrib"]], mod[["var"]][["cor"]]))	
+	
+vars = rownames(mod[["var"]][["contrib"]])	
+attribute_type = rep(c("contribution","correlation"), each = length(vars))	
+contrib_and_cov = cbind(contrib_and_cov, attribute_type)	
+contrib_and_cov	
+	
+plot_data = cbind(as.data.frame(cbind(contrib_and_cov[contrib_and_cov[,"attribute_type"] == "contribution",axes], contrib_and_cov[contrib_and_cov[,"attribute_type"] == "correlation",axes])), vars)	
+names(plot_data) = c("contribution", "correlation", "vars")	
+	
+plot_data = plot_data %>% 	
+  mutate(correlation = round(correlation, 2))	
+	
+plot = plot_data %>% 	
+  ggplot() +	
+  aes(x = reorder(vars, contribution), y = contribution, gradient = correlation, label = correlation)+	
+  geom_col(aes(fill = correlation)) +	
+  geom_hline(yintercept = mean(plot_data$contribution), col = "red", lty = "dashed") + scale_fill_gradient2() +	
+  xlab("variable") +	
+  coord_flip() +	
+  geom_label(color = "black", fontface = "bold", position = position_dodge(0.5))	
+	
+	
+}	
+} else if(!is.na(as.character(mod$Call)[1])){	
+  	
+  if(as.character(mod$Call)[1] == "fa"){	
+    loadings_table = mod$loadings %>% 	
+      matrix(ncol = ncol(mod$loadings)) %>% 	
+      as_tibble() %>% 	
+      mutate(variable = mod$loadings %>% rownames()) %>% 	
+      gather(factor, loading, -variable) %>% 	
+      mutate(sign = if_else(loading >= 0, "positive", "negative"))	
+  	
+  if(!is.null(loadings_above)){	
+    loadings_table[abs(loadings_table[,"loading"]) < loadings_above,"loading"] = NA	
+    loadings_table = loadings_table[!is.na(loadings_table[,"loading"]),]	
+  }	
+  	
+  if(!is.null(axes)){	
+  	
+  loadings_table = loadings_table %>% 	
+     filter(factor == paste0("V",axes))	
+  }	
+  	
+  	
+  plot = loadings_table %>% 	
+      ggplot() +	
+      aes(y = loading %>% abs(), x = reorder(variable, abs(loading)), fill = loading, label =       round(loading, 2)) +	
+      geom_col(position = "dodge") +	
+      scale_fill_gradient2() +	
+      coord_flip() +	
+      geom_label(color = "black", fill = "white", fontface = "bold", position = position_dodge(0.5)) +	
+      facet_wrap(~factor) +	
+      labs(y = "Loading strength", x = "Variable")	
+  }	
+}	
+return(plot)	
+	
+}	
+
+```
+
+
+```{r}
+
+df <- read_sav("PISA15.sav")
+sum(is.na(df))
+sum(!is.na(df))
+```
+
+## visualise for missing variables 
+
+```{r eval=FALSE, include=FALSE}
+ 
+library(VIM)
+ms<-aggr(df,plot = FALSE)
+ plot(ms,numbers=TRUE,cex.numbers=.8)
+```
+
+6% of the data has missing values, hence we drop them from the datset
+
+```{r eval=FALSE, include=FALSE}
+
+missmap(df)
+
+```
+##### Drop anas
+
+We removed NAs because they were five percent of the data
+```{r echo=FALSE}
+df1<-df %>% drop_na()
+
+sum(is.na(df1))
+```
+#### Explore the data
+
+Skew \> 2.0 or kurtosis \> 7.0 would indicate severe univariate nonnormality (Curran et al., 1996). These univariate statistics seem to indicate that all eight measured variables are relatively normally distributed (skew \< 1.0 and kurtosis \< 2.0)
+
+```{r eval=FALSE, include=FALSE}
+describe(df1) %>% knitr::kable(digits = 2)
+```
+#### create a correlation matrix
+
+we start by selecting the variables of interest. All other variables will remain in the original dataset.
+
+```{r}
+
+df_selected <-subset(df1,select = SUPPORT1:LIKESCI5)
+
+df_cor=cor(df_selected)
+
+```
+
+#### Visualise the correlation structure
+
+```{r eval=FALSE, include=FALSE}
+ggcorrplot::ggcorrplot(df_cor)
+```
+#### Network Analysis
+
+```{r}
+library(corrr)
+network_plot(df_cor,min_cor=0.6)
+ 
+```
+
+###Assumptions for Factorability
+
+#### \## Kaiser-Meyer-Olkin (KMO) test
+
+"A KMO value is a ratio of the sum of squared correlations to the sum of squared correlations plus the sum of squared partial correlations". A minimum score of 0.6 is acceptable for EFA- (*Mvududu & Sink, 2013; Watson, 2017)*. Since our data has an overall score of 0.9, hence the data is factorable.
+
+```{r}
+library(gtsummary)
+ KMO(df_cor)
+```
+
+#### cortest.bartlett 
+
+```{r}
+ cortest.bartlett(df_cor,3977)
+ 
+```
+
+#### \## MultivariateNormality mvnTest:
+
+```{r}
+
+library(MVN) # for mvn function
+
+Output <- mvn(df_selected, mvnTest = "hz")
+
+Output$multivariateNormality
+```
+##### multivariate skew
+
+The score of less than 0.05 violates the assumption of multivariate skewness
+
+```{r}
+library(ICS) # for multivariate skew and kurtosis test
+mvnorm.skew.test(df_selected)
+
+```
+
+##### Comment
+
+Both the Multivariate Normality test based on skewness and mvn found a p value of less than 0.05 indicating the data is appropriate for EFA. further we also found an overall score of 0.9 for the Kaiser-Meyer-Olkin (KMO) test. hence we proceed with EFA.
+
+### EFA
+
+# Choosing ideal number of factors
+
+we run the parallel test, VSS technique and Kaiser Gutman criterion to determine the number of factors to include in our model.
+
+#### Parallel Test
+
+suggests 13 factors
+
+```{r}
+fa.parallel(df_cor, n.obs = nrow(df_selected),nfactors = 10, fa = "fa",
+            fm = "pa") 
+```
+
+#### \## VSS technique
+
+suggest 8, 8, 10,10 and 18 factors
+
+```{r}
+nfactors(df_cor, n.obs = nrow(df_selected)) 
+```
+
+#### \## Kaiser Gutman criterion
+
+suggests 8 factors
+
+```{r}
+library(FactoMineR)
+KGC(df_cor,eigen_type = "EFA",n_factors = 10)
+```
+
+##### Comment
+
+Using these three criteria, it appeared that 8 or 10 factors would be sufficient for an optimal balance between comprehensiveness and parsimony. Since both Velicer MAP, VSS and Kaiser Gutman criterion suggest 8 factors, we shall create our model with 8 factors.
+
+#### create the first model
+
+variable **LIKESCI2** (I like reading about science topics) has a highest communality value of 90% with the lowest being 20% **TEABUL1**(teachers called me less often than they called other students)
+
+```{r echo=TRUE}
+mod1 <- fa(df_cor, nfactors = 8, fm = "pa")
+mod1_comm<-as.data.frame(sort(mod1$communality, decreasing = TRUE))
+mod1_comm %>% knitr::kable(digits = 2) %>% kableExtra::kable_styling()
+
+```
+
+### Factor Rotation
+
+we prefer oblique rotation due to their accuracy and to honor the reality that most variables are correlated to some extent (Bandalos & Boehm-Kaufman, 2009). Schmitt (2011), argues that "because oblique rotation methods generally produce accurate and comparable factor structures to orthogonal methods even when interfactor correlations are negligible, it is strongly recommend that researchers only use oblique rotation methods because they generally result in more realistic and more statistically sound factor structures" (p. 312).
+### Structure without rotation 
+```{r eval=FALSE, include=FALSE}
+fa.diagram(mod1)
+```
+
+#### PROMAX ROTATION
+
+Among the potential oblique analytic rotations, promax was chosen because it is an oblique modification of the widely accepted varimax procedure (Gorsuch, 1983; Thompson, 2004).
+
+```{r,fig.height=9,fig.width=8}
+EFA_promax <- fa(df_cor, nfactors = 8,
+                 fm="pa", rotate = "promax")# promax rotation 
+comm_EFA_promx<-as.data.frame(sort(EFA_promax$communality, decreasing = TRUE))
+fa.diagram(EFA_promax)
+comm_EFA_promx%>% knitr::kable(digits = 2)
+```
+
+#### Varimax Rotation
+
+The varimax rotation does not consider the correlation between PA1,PA6,PA7. hence will we use the promax rotation.
+
+```{r include=FALSE}
+EFA_varimax <- fa(df_cor, nfactors = 8, 
+                  fm="pa", rotate = "varimax")# varimax rotation 
+
+fa.diagram(EFA_varimax)
+
+```
+
+#### Factor Loadings
+
+Comrey and Lee (1992) suggested that loadings greater than **.70** are excellent, **.63** are very good, **.55** are good, **.45** are fair, and **.32** are poor. Morin et al. (2020) concluded that loadings ≥.**50** are "fully satisfactory" (p. 1052). Hence we will accept loadings above **.55**
+
+```{r eval=FALSE, include=FALSE}
+
+fviz_loadnings_with_cor(EFA_promax, axes = 1, loadings_above = 0.40)
+fviz_loadnings_with_cor(EFA_promax, axes = 8, loadings_above = 0.40)
+
+
+```
+
+#### Select variables
+
+We redo the process create the subset - by removing valuables with less influence
+
+```{r}
+
+df_w2 <- subset(df_selected, 
+                select = -c(TEABUL1,TEABUL2,TEABUL3,AMBI4,AMBI3,WORRY5))
+
+df_Cor2 <- cor(df_w2)
+
+```
+
+parallel Test
+
+```{r}
+fa.parallel(df_Cor2, n.obs = nrow(df_w2), 
+            fa = "fa", fm = "pa")
+
+```
+
+#### VSS
+8,8,
+
+```{r}
+nfactors(df_Cor2, n.obs = nrow(df_w2))
+```
+
+#### \## Kaiser Gutman criterion
+
+8 factors
+
+```{r}
+ KGC(df_Cor2,eigen_type = "EFA",n_factors = 8)
+```
+
+Since all the tests have suggested 8 factors, we create a model with 8 factors using our adjusted dataset
+
+```{r include=FALSE}
+EFA_mod3 <- fa(df_Cor2, nfactors = 8, 
+               fm = "pa", rotate = "promax")
+EFA_mod3
+
+```
+
+#### Final model
+
+loadings above 0.5
+
+```{r}
+fa.diagram(EFA_mod3,cut=0.5)# fator analysis structure 
+```
+
+```{r eval=FALSE, include=FALSE}
+fviz_loadnings_with_cor(EFA_mod3, axes = 1, loadings_above = 0.55)# loadings 
+
+fviz_loadnings_with_cor(EFA_mod3, axes = 2, loadings_above = 0.55)#loadings
+fviz_loadnings_with_cor(EFA_mod3, axes = 3, loadings_above = 0.55)
+fviz_loadnings_with_cor(EFA_mod3, axes = 4, loadings_above = 0.55)
+fviz_loadnings_with_cor(EFA_mod3, axes = 5, loadings_above = 0.55)
+fviz_loadnings_with_cor(EFA_mod3, axes = 6, loadings_above = 0.55)
+fviz_loadnings_with_cor(EFA_mod3, axes = 7, loadings_above = 0.55)
+fviz_loadnings_with_cor(EFA_mod3, axes = 8, loadings_above = 0.55)
+```
+
+##### Post extraction communality
+
+LIKESCI2(I like reading about science topic) and LIKESCI2(I'm Interested in Learning about Science) had the highest post extraction community percentage of 90%.while the lost score was 65%WORRY1(I always worry that it will be very dificult for me taking a test). The mean communality was 65%.
+
+
+```{r}
+EFA_mod3_common <- as.data.frame(sort(EFA_mod3$communality, 
+                                      decreasing = TRUE))
+
+EFA_mod3_common %>% knitr::kable(caption = "post Extration Communality Table",
+                                 digits = 2) %>% kableExtra::kable_styling()
+mean(EFA_mod3$communality) 
+```
+
+### Factor scores
+
+we join the factor scores to the main dataset
+
+```{r}
+
+factorscores = factor.scores(df_w2, EFA_mod3)$scores
+```
+
+```{r}
+variable_factorscores = cbind(df1, factorscores)
+```
+
+### Rename factors
+
+we rename factors so we can make them easy to read
+
+```{r}
+variable_factorscores<-variable_factorscores %>% 
+  rename(TEASUPPORT=(PA1),
+         LIKES=(PA2),
+         BELONG=(PA3),
+         PARENTSP=(PA4),
+         WORRY=(PA5),
+         DISCORD=(PA6),
+         TEABUL=(PA7),
+         AMBITIONS=(PA8))
+
+```
+
+##### save dataset with a new name
+
+```{r}
+df_clean<-variable_factorscores
+df_final<-variable_factorscores
+```
+
+#### Recod gender into factor
+
+It is presented as a numeric variable but we need to keep it as a categorical variable with two levels 1 female 2 male
+
+```{r}
+
+df_final$GENDER<- factor(df_final$GENDER)
+ 
+df_final$GENDER<- recode_factor(df_final$GENDER,"1"="Female","2"="Male")
+df_reg<- df_final %>% dplyr::select(BOOKS,GENDER,SCIESCORE,
+                             BELONG,LIKES,TEASUPPORT,
+                             DISCORD,WORRY,PARENTSP,TEABUL,AMBITIONS)
+```
+
+## dataframe summary 
+```{r}
+summarytools::dfSummary(df_reg,graph.col = FALSE,plain.ascii = FALSE,varnumbers = FALSE,trim.strings = TRUE,valid.col = FALSE) %>% knitr::kable()
+```
+
+##### REGRESSION ANALYSIS
+
+##### create training and test dataset
+
+We split the data into training and testing set. 70% training while 30% testing. We use catTools package.
+
+```{r}
+set.seed(1)
+library(caTools)
+sample <- sample.split(df_reg$GENDER, SplitRatio = 0.70)
+train  <- subset(df_reg, sample == TRUE)
+test   <- subset(df_reg, sample == FALSE)
+
+train$BOOKS<-as.numeric(train$BOOKS)
+```
+#
+```{r}
+library(GGally)
+#ggpairs(train)
+str(train)
+pairs(train, pch = 18, col = "black")
+```
+
+
+```{r}
+table1::table1(~BOOKS+SCIESCORE+
+                             BELONG+LIKES+TEASUPPORT+
+                             DISCORD+WORRY+PARENTSP+TEABUL+AMBITIONS|GENDER,caption="Descriptive Statistics",
+                  data = train,transpose=FALSE,
+               topclass="Rtable1-grid Rtable1-shade Rtable1-times")
+```
+### Visualise
+
+```{r}
+ggplot(train,aes(GENDER,SCIESCORE,fill=GENDER))+
+  geom_boxplot(outlier.shape = 8,outlier.colour = "red")+
+  theme_bw()
+```
+#Dependant variable 
+The data is normally distributed 
+```{r}
+ggplot(train,aes(SCIESCORE,..density..))+
+  geom_histogram()+
+  geom_density()+
+  geom_vline(aes(xintercept = mean(SCIESCORE)),
+                 color="red",linetype="dashed")+
+  theme_bw()
+```
+```{r}
+PISA_Mod1<- lm(SCIESCORE~BOOKS+LIKES+GENDER+BELONG+TEASUPPORT+
+                AMBITIONS+PARENTSP+WORRY+TEABUL+DISCORD,data = train)
+```
+
+
+#### observe the coeficients
+
+```{r}
+summary(PISA_Mod1)
+```
+
+### model 2
+
+we removed the variables with low significance levels
+
+```{r}
+PISA_mod2<- lm(SCIESCORE~BOOKS+LIKES+BELONG+TEASUPPORT+
+                AMBITIONS+PARENTSP+WORRY+TEABUL+DISCORD,data = train)
+```
+
+#view coefiencts
+
+```{r}
+library(broom)
+summary(PISA_mod2)
+
+```
+### add predictions to the test dataset
+
+```{r}
+test$pred<-predict(PISA_mod2,newdata = test)
+
+```
+
+### visualise predictions vs actual score
+
+shows a linear relationship between the actual and predicted values
+
+```{r}
+test %>% ggplot(aes(pred,SCIESCORE))+
+  geom_point()+
+  geom_smooth(method = "lm",se=FALSE)+
+  theme_bw()
+
+```
+
+### model performance
+model with a few predictors is has a better fit based on AIC 
+
+```{r}
+glance(PISA_Mod1)$adj.r.squared
+glance(PISA_mod2)$adj.r.squared
+ 
+
+AIC(PISA_Mod1,PISA_mod2) %>% arrange(desc(AIC))
+tidy(PISA_mod2) %>% knitr::kable(caption = "Table: regression coefients",digits = 2)
+```
+#
+```{r}
+library(Metrics)
+train$PRED<-predict(PISA_Mod1)
+rmse(train$SCIESCORE,train$PRED)
+train$pred2<- predict(PISA_mod2)
+rmse(train$SCIESCORE,train$pred2)
+
+```
+
+```{r}
+library(modelsummary)
+msummary(list(PISA_Mod1,PISA_mod2), # List the models to include
+         stars = TRUE)
+```
+### dominabce analysis 
+```{r}
+library(dominanceanalysis)
+Dominance_mod<-dominanceAnalysis(PISA_mod2)
+
+contributionByLevel(Dominance_mod, fit.functions="r2") %>% 
+  knitr::kable(digits = 3)
+
+```
+Books and sense of belonging has grater dominace on our model. 
+```{r}
+
+plot(Dominance_mod, which.graph ="conditional",fit.function = "r2")
+```
+
+
+```{r,fig.width=10}
+plot(Dominance_mod, which.graph ="general",fit.function = "r2")
+```
+
+
+### model Assumptions 
+#### Absence of multicollinearity
+
+score 1 meaning our model is okay
+
+```{r message=FALSE}
+library(car)
+vif(PISA_mod2)
+```
+
+#### Linearity
+
+```{r}
+plot(PISA_mod2,which=1)
+
+```
+
+# Normality of the residuals
+
+```{r}
+plot(PISA_mod2,which=2)
+```
+
+#Homogeneity of variance
+
+```{r}
+plot(PISA_mod2,which=3)
+```
+# Detecting influential outliers
+```{r}
+plot(PISA_mod2,which=4)
+```
+
+# Detecting influential outliers
+
+```{r}
+plot(PISA_mod2,which=5)
+```
+
+#### plot the models 
+```{r message=FALSE, warning=FALSE}
+library(stargazer)
+
+stargazer(PISA_Mod1, PISA_mod2,
+          type = "text",
+          object.names = TRUE,
+          align = TRUE,
+          model.numbers = FALSE,
+          single.row = TRUE,
+          digits = 2,
+          df = FALSE,
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          intercept.bottom = FALSE,
+          dep.var.labels = "READSCORE",
+          covariate.labels = c("Constant",
+                               "Books",
+                               "Gender:Male",
+                               "Likes",
+                               "Belong",
+                               "Teacher Support",
+                               "Ambitions",
+                               "Parent Support",
+                               "Worry",
+                               "Tacher bulying"),
+          title = "Table 3. Regression Results Model 1-2",
+          keep.stat = c("n","adj.rsq", "f","aic"),
+          no.space = TRUE,
+          out = "models.text")
+
+```
