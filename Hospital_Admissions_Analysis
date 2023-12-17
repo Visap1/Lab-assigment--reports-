@@ -1,0 +1,135 @@
+---
+ title: "Hospital Adminssion"
+author: "Victor S Phiri"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+  keep_tex: yes
+latex_engine: pdflatex
+classoption: openany
+header-includes:
+  \usepackage{setspace}
+  \onehalfspacing
+  \usepackage{helvet}
+  \usepackage{float}
+  \usepackage{array}
+  \usepackage[utf8]{inputenc}
+  \usepackage{multirow}
+  \renewcommand\familydefault{\sfdefault}
+geometry: margin=2cm
+editor_options: 
+  markdown: 
+    wrap: 72
+
+---
+
+```{r}
+require("knitr")
+require("summarytools")
+require("rmarkdown")
+require("kableExtra")
+require("haven")
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message = FALSE, comment=NA,prompt = FALSE, cache = FALSE, results = 'asis',fig.width = 8,fig.height = 6,results = 'asis',tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+ 
+
+st_options(bootstrap.css     = FALSE,       # Already part of the theme so no need for it
+           plain.ascii       = FALSE,       # One of the essential settings
+           style             = "rmarkdown", # Idem.
+           dfSummary.silent  = TRUE,        # Suppresses messages about temporary files
+           footnote          = NA,          # Keeping the results minimalistic
+           subtitle.emphasis = FALSE)       # For the vignette theme, this gives better results.
+                                            # For other themes, using TRUE might be preferable.
+
+st_css()
+
+```
+
+
+```{r setup, include=FALSE}
+
+library(readxl)
+library(dplyr)
+library(readxl)
+library(gtsummary)
+library(gt)
+library(Hmisc)
+library(condformat)
+```
+
+
+```{r setup, include=FALSE}
+df=read_csv("datacamp_workspace_export_2023-07-08 09_05_28.csv")
+```
+# Overview 
+You work for a consulting company helping a hospital group better understand patient readmissions. The hospital gave you access to ten years of information on patients readmitted to the hospital after being discharged. The doctors want you to assess if initial diagnoses, number of procedures, or other variables could help them better understand the probability of readmission.
+
+They want to focus follow-up calls and attention on those patients with a higher probability of readmission.
+
+_formation in the file_
+"age" - age bracket of the patient
+"time_in_hospital" - days (from 1 to 14)
+"n_procedures" - number of procedures performed during the hospital stay
+"n_lab_procedures" - number of laboratory procedures performed during the hospital stay
+"n_medications" - number of medications administered during the hospital stay
+"n_outpatient" - number of outpatient visits in the year before a hospital stay
+"n_inpatient" - number of inpatient visits in the year before the hospital stay
+"n_emergency" - number of visits to the emergency room in the year before the hospital stay
+"medical_specialty" - the specialty of the admitting physician
+"diag_1" - primary diagnosis (Circulatory, Respiratory, Digestive, etc.)
+"diag_2" - secondary diagnosis
+"diag_3" - additional secondary diagnosis
+"glucose_test" - whether the glucose serum came out as high (> 200), normal, or not performed
+"A1Ctest" - whether the A1C level of the patient came out as high (> 7%), normal, or not performed
+"change" - whether there was a change in the diabetes medication ('yes' or 'no')
+"diabetes_med" - whether a diabetes medication was prescribed ('yes' or 'no')
+"readmitted" - if the patient was readmitted at the hospital ('yes' or 'no')
+
+_Reference_
+Acknowledgments: Beata Strack, Jonathan P. DeShazo, Chris Gennings, Juan L. Olmo, Sebastian Ventura, Krzysztof J. Cios, and John N. Clore, "Impact of HbA1c Measurement on Hospital Readmission Rates: Analysis of 70,000 Clinical Database Patient Records," BioMed Research International, vol. 2014, Article ID 781670, 11 pages, 2014.
+
+```{r}
+summary(df)
+```
+```{r}
+library(ggplot2)
+df %>% filter(!is.na(diag_1))%>%
+  ggplot(aes(diag_1))+
+  geom_bar() +
+  facet_wrap(~age) +
+  theme_bw() +
+  coord_flip()
+```
+
+
+```{r}
+df %>% filter(!is.na(diag_2))%>%
+  ggplot(aes(diag_2))+
+  geom_bar() +
+  facet_wrap(~age) +
+  theme_bw() +
+  coord_flip()
+```
+
+
+
+```{r explore data}
+df$readmitted=as.factor(df$readmitted)
+df$medical_specialty=factor(df$medical_specialty)
+#summary(All_mod <- glm(readmitted ~ ., data = df, family = binomial))
+  
+MM2<- glm(readmitted~n_outpatient+n_inpatient+n_emergency+medical_specialty +diag_1+diag_2+diag_3,data = df,family="binomial")
+
+MM_df<-broom::tidy(MM2)
+library(kableExtra)
+ kableExtra::kable(MM_df) %>% kable_styling(latex_options = "stripped")
+```
+```{r}
+boundary.excel <-
+    condformat(MM_df) %>%
+    rule_fill_discrete('p.value', expression=cut(MM_df$p.value, breaks=c(0,0.05,1), include.lowest=T, labels=F), colours=c('1'='green', '2'='red'))
+    
+condformat2excel(boundary.excel, 'Results.xlsx')
+
+```
+ 
